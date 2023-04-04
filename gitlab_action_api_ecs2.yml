@@ -1,0 +1,55 @@
+image: docker:19.03.8
+
+variables:
+  REGION: $AWS_DEFAULT_REGION
+
+services:
+  - docker:dind
+
+before_script:
+  - apk add --no-cache curl jq python py-pip
+  - pip install awscli
+  - $(aws ecr get-login --no-include-email --region "${REGION}")
+  - if [ $CI_COMMIT_BRANCH == "dev" ]; then IMAGE_TAG="dev"; fi
+  - if [ $CI_COMMIT_BRANCH == "staging" ]; then IMAGE_TAG="staging"; fi
+  - if [ $CI_COMMIT_BRANCH == "dev" ]; then TASK_DEFINTION_NAME="$DEV_TASK_DEFINTION_NAME"; fi
+  - if [ $CI_COMMIT_BRANCH == "staging" ]; then TASK_DEFINTION_NAME="$STAGING_TASK_DEFINTION_NAME"; fi
+  - if [ $CI_COMMIT_BRANCH == "dev" ]; then CLUSTER_NAME="$DEV_CLUSTER_NAME"; fi
+  - if [ $CI_COMMIT_BRANCH == "staging" ]; then CLUSTER_NAME="$STAGING_CLUSTER_NAME"; fi
+  - if [ $CI_COMMIT_BRANCH == "dev" ]; then SERVICE_NAME="$DEV_SERVICE_NAME"; fi
+  - if [ $CI_COMMIT_BRANCH == "staging" ]; then SERVICE_NAME="$STAGING_SERVICE_NAME"; fi
+
+stages:
+  - build
+  - deploy
+
+## BUILD
+build:
+  stage: build
+  script:
+    - docker build -t $REPOSITORY_URL:$IMAGE_TAG .
+    - docker push $REPOSITORY_URL:$IMAGE_TAG
+  only:
+    refs:
+      - dev
+      - staging
+
+## DEPLOY
+deploy:
+  stage: deploy
+  needs:
+    - build
+  script:
+    - echo $REPOSITORY_URL:$IMAGE_TAG
+    - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "$TASK_DEFINTION_NAME" --region "${REGION}")
+    - task_memory=$(echo $TASK_DEFINITION | jq '.taskDefinition.memory' | bc)
+    - task_cpu=$(echo $TASK_DEFINITION | jq '.taskDefinition.cpu' | bc)
+    - NEW_CONTAINER_DEFINITION=$(echo $TASK_DEFINITION | python $update_task_definition_image $REPOSITORY_URL:$IMAGE_TAG)
+    - echo "Registering new container definition..."
+    - aws ecs register-task-definition --requires-compatibilities "FARGATE" --execution-role-arn "${execution_role}" --network-mode "awsvpc" --cpu "${task_cpu}" --family "${TASK_DEFINTION_NAME}" --container-definitions "${NEW_CONTAINER_DEFINITION}" --memory "${task_memory}"
+    - echo "Updating the service..."
+    - aws ecs update-service --region "${REGION}" --cluster "${CLUSTER_NAME}" --service "${SERVICE_NAME}"  --task-definition "${TASK_DEFINTION_NAME}"
+  only:
+    refs:
+      - dev
+      - staging

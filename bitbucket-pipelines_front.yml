@@ -1,0 +1,77 @@
+image: atlassian/default-image:3
+
+pipelines:
+  default:
+    - parallel:
+        - step:
+            image: node:12.20.0
+            name: "lint"
+            caches:
+              - node
+            script: # Modify the commands below to build your repository.
+              - apt-get update && apt-get install -y libxtst-dev libpng++-dev
+              - yarn
+              - yarn lint
+  branches:
+    dev:
+      - step:
+          image: node:12.20.0
+          name: Build
+          size: 2x
+          script:
+            - apt-get update && apt-get install -y libxtst-dev libpng++-dev
+            - yarn
+            - npm version patch -m "[skip ci] patch version to %s "
+            - git add .
+            - git push && git push --tags
+            - yarn build:stag
+          artifacts:
+            - dist/**
+      - step:
+          name: Deploy staging
+          deployment: staging
+          script:
+            - pipe: atlassian/aws-s3-deploy:0.3.7
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                S3_BUCKET: $S3_BUCKET
+                LOCAL_PATH: "dist"
+            - pipe: atlassian/aws-cloudfront-invalidate:0.1.2
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                DISTRIBUTION_ID: $DISTRIBUTION_ID
+    master:
+      - step:
+          image: node:12.20.0
+          name: Build
+          size: 2x
+          script:
+            - apt-get update && apt-get install -y libxtst-dev libpng++-dev
+            - yarn
+            - npm version minor -m "[skip ci] minor version to %s "
+            - git add .
+            - git push && git push --tags
+            - yarn build:prod
+          artifacts:
+            - dist/**
+      - step:
+          name: Deploy production
+          deployment: production
+          script:
+            - pipe: atlassian/aws-s3-deploy:0.3.7
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                S3_BUCKET: $S3_BUCKET
+                LOCAL_PATH: "dist"
+            - pipe: atlassian/aws-cloudfront-invalidate:0.1.2
+              variables:
+                AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID
+                AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY
+                AWS_DEFAULT_REGION: $AWS_DEFAULT_REGION
+                DISTRIBUTION_ID: $DISTRIBUTION_ID

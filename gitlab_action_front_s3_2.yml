@@ -1,0 +1,45 @@
+image: docker:latest
+services:
+  - docker:dind
+stages:
+  - build
+  - deploy
+######################
+## BUILD
+######################
+build:
+  image: node:15.5
+  stage: build
+  before_script:
+    - yarn install
+  script:
+    - if [ $CI_COMMIT_BRANCH == "dev" ]; then yarn build:dev; fi
+    - if [ $CI_COMMIT_BRANCH == "staging" ]; then yarn build:staging; fi
+
+  only:
+    refs:
+      - dev
+      - staging
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 day
+######################
+## DEPLOY
+######################
+deploy:
+  image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
+  stage: deploy
+  before_script:
+    - if [ $CI_COMMIT_BRANCH == "dev" ]; then AWS_BUCKET="$S3_BUCKET_NAME_DEV"; fi
+    - if [ $CI_COMMIT_BRANCH == "staging" ]; then AWS_BUCKET="$S3_BUCKET_NAME_STAGING"; fi
+    - if [ $CI_COMMIT_BRANCH == "dev" ]; then DISTRIBUTION_ID="$DISTRIBUTION_ID_DEV"; fi
+    - if [ $CI_COMMIT_BRANCH == "staging" ]; then DISTRIBUTION_ID="$DISTRIBUTION_ID_STAGING"; fi
+  script:
+    - aws configure set region $AWS_DEFAULT_REGION
+    - aws s3 cp ./build s3://$AWS_BUCKET/ --recursive
+    - aws cloudfront create-invalidation --distribution-id ${DISTRIBUTION_ID} --paths '/*'
+  only:
+    refs:
+      - dev
+      - staging

@@ -1,0 +1,54 @@
+name: Deploy to Amazon S3 bucket
+on:
+  push:
+    branches:
+      - develop
+#       - master
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+    steps:
+      - name: Set environment for branch
+        id: set-env
+        run: |
+          if [[ "${{github.base_ref}}" == "develop" || "${{github.ref}}" == "refs/heads/develop" ]]; then
+              echo "::set-output name=s3_bucket::${{ secrets.DEV_S3_BUCKET }}"
+              echo "::set-output name=cloudfront_distribution_id::${{ secrets.DEV_CLOUDFRONT_DISTRIBUTION_ID }}"
+          fi
+          if [[ "${{github.base_ref}}" == "master" || "${{github.ref}}" == "refs/heads/master" ]]; then
+              echo "::set-output name=s3_bucket::${{ secrets.PROD_S3_BUCKET }}"
+              echo "::set-output name=cloudfront_distribution_id::${{ secrets.PROD_CLOUDFRONT_DISTRIBUTION_ID }}"
+          fi
+      - uses: actions/checkout@v2
+
+      - uses: actions/setup-node@v2
+        with:
+          node-version: 16.15.0
+          registry-url: https://registry.npmjs.org/
+      - run: yarn install
+
+      - name: Build
+        run: yarn build
+        continue-on-error: true
+        #           run: |
+        #             if [[ "${{github.base_ref}}" == "develop" || "${{github.ref}}" == "refs/heads/develop" ]]; then
+        #                 yarn build:dev
+        #             fi
+        #             if [[ "${{github.base_ref}}" == "master" || "${{github.ref}}" == "refs/heads/master" ]]; then
+        #                 yarn build:prod
+        #             fi
+
+      - name: Deploy
+        uses: reggionick/s3-deploy@v3
+        with:
+          folder: build
+          bucket: ${{ steps.set-env.outputs.s3_bucket }}
+          bucket-region: eu-north-1
+          dist-id: ${{ steps.set-env.outputs.cloudfront_distribution_id }}
+          invalidation: /*
+          delete-removed: false
+          no-cache: true
+          private: true

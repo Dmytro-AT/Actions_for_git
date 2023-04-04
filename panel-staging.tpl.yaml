@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: panel-staging
+  name: panel-staging
+spec:
+  selector:
+    matchLabels:
+      app: panel-staging
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: panel-staging
+    spec:
+      containers:
+        - env:
+            - name: NODE_ENV
+              value: "development"
+            - name: ENV
+              value: "development"
+            - name: TIMEOUT
+              value: "10000"
+          image: project/panel-staging:${BITBUCKET_COMMIT}
+          imagePullPolicy: Always
+          name: panel-staging
+          ports:
+            - containerPort: 3002
+          resources:
+            limits:
+              cpu: 500m
+              memory: 1024Mi
+            requests:
+              cpu: 100m
+              memory: 512Mi
+      imagePullSecrets:
+        - name: regcred
+      restartPolicy: Always

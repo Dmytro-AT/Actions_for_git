@@ -1,0 +1,108 @@
+# For docker swarm
+image: node:12.11.1
+
+pipelines:
+  branches:
+    develop:
+      - step:
+          image: node:12.11.1-alpine
+          name: build-staging
+          caches:
+            - docker
+          size: 2x
+          script:
+            - echo build $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT
+            - unset NPM_CONFIG_USER
+            - npm i --production
+            - npm run build
+            - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
+            - docker build -t $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT .
+            - docker push $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT
+          services:
+            - docker
+      - step:   # This step only for kubernetes cluster
+          image: atlassian/default-image:2
+          name: "Deploy to k8s dev"
+          deployment: development
+          script:
+            - envsubst < panel-staging.tpl.yaml > panel-staging.yaml
+            - cat panel-staging.yaml
+            - pipe: atlassian/aws-eks-kubectl-run:1.4.1
+              variables:
+                AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID_K8S}
+                AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY_K8S}
+                AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION}
+                CLUSTER_NAME: "dev-eks"
+                KUBECTL_COMMAND: "apply"
+                RESOURCE_PATH: "panel-staging.yaml"
+                DEBUG: "true"
+    staging:
+      - step:
+          image: node:12.11.1-alpine
+          name: build-dev-staging
+          caches:
+            - docker
+          size: 2x
+          script:
+            - echo build $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT
+            - unset NPM_CONFIG_USER
+            - npm i --production
+            - ENV=$ENV npm run build
+            - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
+            - docker build -t $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT .
+            - docker push $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT
+          services:
+            - docker
+      - step:
+          image: node:12.11.1
+          name: deploy-dev-staging
+          deployment: devstaging
+          script:
+            - apt-get update
+            - apt-get install openssh-client gettext
+            - eval $(ssh-agent -s)
+            - echo $STAGING_SSH_PRIVATE_KEY | base64 --decode  > key
+            - chmod 600 key
+            - ssh-add key
+            - mkdir -p ~/.ssh
+            - echo $STAGING_SSH_PRIVATE_KEY | base64 --decode  > ~/.ssh/staging
+            - chmod 0600 ~/.ssh/staging
+            - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+            - cat deploy.sh | envsubst | ssh -i ~/.ssh/staging -o StrictHostKeyChecking=no -A -t docker@$DEVELOPMENT_STAGING_SWARM_MANAGER
+    live:
+      - step:
+          image: node:12.11.1-alpine
+          name: build-dev-staging
+          caches:
+            - docker
+          size: 2x
+          script:
+            - echo build $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT
+            - unset NPM_CONFIG_USER
+            - npm i --production
+            - ENV=devStaging npm run build
+            - docker login -u $DOCKER_HUB_USER -p $DOCKER_HUB_PASSWORD
+            - docker build -t $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT .
+            - docker push $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT
+          services:
+            - docker
+      - step:
+          image: node:12.11.1
+          name: deploy-dev-staging
+          deployment: live
+          script:
+            - apt-get update
+            - apt-get install openssh-client gettext
+            - eval $(ssh-agent -s)
+            - echo $STAGING_SSH_PRIVATE_KEY | base64 --decode  > key
+            - chmod 600 key
+            - ssh-add key
+            - mkdir -p ~/.ssh
+            - echo $STAGING_SSH_PRIVATE_KEY | base64 --decode  > ~/.ssh/staging
+            - chmod 0600 ~/.ssh/staging
+            - '[[ -f /.dockerenv ]] && echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config'
+            - cat deploy.sh | envsubst | ssh -i ~/.ssh/staging -o StrictHostKeyChecking=no -A -t docker@$LIVE_SWARM_MANAGER
+definitions:
+  services:
+    docker:
+      memory: 2048

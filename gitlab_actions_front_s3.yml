@@ -1,0 +1,61 @@
+image: docker:latest
+services:
+  - docker:dind
+stages:
+  - build
+  - deploy
+######################
+## CACHE NODE MODULES##
+######################
+cache:
+  key: $CI_COMMIT_REF_SLUG
+  paths:
+    - node_modules/
+######################
+## BUILD STAGE ##
+######################
+build:
+  image: node:16
+  stage: build
+  before_script:
+    - yarn install
+  script:
+    - if [ $CI_COMMIT_BRANCH == "develop" ]; then yarn build:development; fi
+    - if [ $CI_COMMIT_BRANCH == "qatest" ]; then yarn build:production; fi
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+      when: manual
+    - if: '$CI_COMMIT_BRANCH != "develop"'
+      when: never
+    - when: always
+  artifacts:
+    paths:
+      - build/
+    expire_in: 1 day
+######################
+## DEPLOY STAGE ##
+######################
+deploy:
+  image: python:latest
+  stage: deploy
+  needs:
+    - build
+  before_script:
+    - |
+      if [ $CI_COMMIT_BRANCH == "master" ]; then
+        DISTRIBUTION_ID=$PROD_DISTRIBUTION_ID;
+        S3_BUCKET=$PROD_S3_BUCKET
+      fi
+      if [ $CI_COMMIT_BRANCH == "develop" ]; then
+        DISTRIBUTION_ID=$DEV_DISTRIBUTION_ID;
+        S3_BUCKET=$DEV_S3_BUCKET
+      fi
+  script:
+    - pip install awscli
+    - aws configure set region $AWS_REGION
+    - aws s3 cp ./build s3://$S3_BUCKET/ --recursive
+    - aws cloudfront create-invalidation --distribution-id ${DISTRIBUTION_ID} --paths '/*'
+  only:
+    refs:
+      - develop
+      - master

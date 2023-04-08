@@ -12,10 +12,10 @@ build:
   stage: build
   before_script:
     - yarn install
+    - if [ $CI_COMMIT_BRANCH == "dev" ]; then cat $DEV_ENV > $(pwd)/.env; fi
+    - if [ $CI_COMMIT_BRANCH == "staging" ]; then cat $STAGING_ENV > $(pwd)/.env; fi
   script:
-    - if [ $CI_COMMIT_BRANCH == "dev" ]; then yarn build:dev; fi
-    - if [ $CI_COMMIT_BRANCH == "staging" ]; then yarn build:staging; fi
-
+    - yarn build
   only:
     refs:
       - dev

@@ -2,12 +2,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: panel-staging
-  name: panel-staging
+    app: panel-dev
+  name: panel-dev
 spec:
   selector:
     matchLabels:
-      app: panel-staging
+      app: panel-dev
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -16,7 +16,7 @@ spec:
   template:
     metadata:
       labels:
-        app: panel-staging
+        app: panel-dev
     spec:
       containers:
         - env:
@@ -26,9 +26,9 @@ spec:
               value: "development"
             - name: TIMEOUT
               value: "10000"
-          image: project/panel-staging:${BITBUCKET_COMMIT}
+          image: project/panel-dev:${BITBUCKET_COMMIT}
           imagePullPolicy: Always
-          name: panel-staging
+          name: panel-dev
           ports:
             - containerPort: 3002
           resources:

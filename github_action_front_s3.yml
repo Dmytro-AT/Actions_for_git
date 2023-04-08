@@ -1,4 +1,4 @@
-name: Deploy workflow for S3 bucket
+name: Deploy workflow for S3 bucket without CloudFront
 on:
   push:
     branches:

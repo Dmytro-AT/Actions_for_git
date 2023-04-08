@@ -21,7 +21,7 @@ build:
     - yarn install
   script:
     - if [ $CI_COMMIT_BRANCH == "develop" ]; then yarn build:development; fi
-    - if [ $CI_COMMIT_BRANCH == "qatest" ]; then yarn build:production; fi
+    - if [ $CI_COMMIT_BRANCH == "master" ]; then yarn build:production; fi
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
       when: manual

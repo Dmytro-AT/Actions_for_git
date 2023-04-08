@@ -20,7 +20,7 @@ pipelines:
             - docker push $DOCKER_HUB_ORGANIZATION/$SERVICE:$BITBUCKET_COMMIT
           services:
             - docker
-      - step:   # This step only for kubernetes cluster
+      - step: # This step only for kubernetes cluster
           image: atlassian/default-image:2
           name: "Deploy to k8s dev"
           deployment: development

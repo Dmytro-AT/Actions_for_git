@@ -27,8 +27,6 @@ jobs:
               echo "cluster=prod-api-cluster" >> $GITHUB_OUTPUT
               echo "image-tag=latest" >> $GITHUB_OUTPUT
           fi
-        #      - name: Checkout
-        #        uses: actions/checkout@v2
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v1-node16

@@ -3,7 +3,7 @@ on:
   push:
     branches:
       - develop
-#       - master
+      - master
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -15,12 +15,12 @@ jobs:
         id: set-env
         run: |
           if [[ "${{github.base_ref}}" == "develop" || "${{github.ref}}" == "refs/heads/develop" ]]; then
-              echo "::set-output name=s3_bucket::${{ secrets.DEV_S3_BUCKET }}"
-              echo "::set-output name=cloudfront_distribution_id::${{ secrets.DEV_CLOUDFRONT_DISTRIBUTION_ID }}"
+              echo "s3_bucket=${{ secrets.DEV_S3_BUCKET }}" >> $GITHUB_OUTPUT
+              echo "cloudfront_distribution_id=${{ secrets.DEV_CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
           fi
           if [[ "${{github.base_ref}}" == "master" || "${{github.ref}}" == "refs/heads/master" ]]; then
-              echo "::set-output name=s3_bucket::${{ secrets.PROD_S3_BUCKET }}"
-              echo "::set-output name=cloudfront_distribution_id::${{ secrets.PROD_CLOUDFRONT_DISTRIBUTION_ID }}"
+              echo "s3_bucket=${{ secrets.PROD_S3_BUCKET }}" >> $GITHUB_OUTPUT
+              echo "cloudfront_distribution_id=${{ secrets.PROD_CLOUDFRONT_DISTRIBUTION_ID }}" >> $GITHUB_OUTPUT
           fi
       - uses: actions/checkout@v2
 
@@ -33,13 +33,13 @@ jobs:
       - name: Build
         run: yarn build
         continue-on-error: true
-        #           run: |
-        #             if [[ "${{github.base_ref}}" == "develop" || "${{github.ref}}" == "refs/heads/develop" ]]; then
-        #                 yarn build:dev
-        #             fi
-        #             if [[ "${{github.base_ref}}" == "master" || "${{github.ref}}" == "refs/heads/master" ]]; then
-        #                 yarn build:prod
-        #             fi
+#        run: |
+#         if [[ "${{github.base_ref}}" == "develop" || "${{github.ref}}" == "refs/heads/develop" ]]; then
+#             yarn build:dev
+#         fi
+#         if [[ "${{github.base_ref}}" == "master" || "${{github.ref}}" == "refs/heads/master" ]]; then
+#             yarn build:prod
+#         fi
 
       - name: Deploy
         uses: reggionick/s3-deploy@v3

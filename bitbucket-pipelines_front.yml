@@ -25,6 +25,7 @@ pipelines:
             - git add .
             - git push && git push --tags
             - yarn build:stag
+            - yarn cache clean
           artifacts:
             - dist/**
       - step:

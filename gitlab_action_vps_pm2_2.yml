@@ -3,7 +3,9 @@ stages:
   - test
   - build
   - deploy
-
+###################
+## Code build
+###################
 build:
   image: node:16.15.0
   stage: build
@@ -29,9 +31,9 @@ build:
     paths:
       - build/
     expire_in: 1 day
-######################
-## DEPLOY ARTIFACTS ##
-######################
+###################
+# DEPLOY ARTIFACTS
+###################
 deploy:
   stage: deploy
   needs:
@@ -60,7 +62,7 @@ deploy:
       - dev
       - master
 ######################
-## CODE QUALITY CHECKS ##
+## CODE QUALITY CHECKS
 ######################
 sonarqube-check:
   stage: test

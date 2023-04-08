@@ -2,7 +2,9 @@ stages:
   - test
   - build
   - deploy
-
+#############
+# Build code
+#############
 build:
   stage: build
   image:
@@ -14,7 +16,9 @@ build:
   only:
     - develop
     - master
-
+##############
+# Deploy code
+##############
 deploy:
   stage: deploy
   image: registry.gitlab.com/gitlab-org/cloud-deploy/aws-base:latest
@@ -44,7 +48,9 @@ deploy:
   only:
     - develop
     - master
-
+#################
+# SonarQube check
+#################
 sonarqube-check:
   stage: test
   image:
@@ -62,4 +68,3 @@ sonarqube-check:
   allow_failure: true
   only:
     - develop # or the name of your main branch
-
